@@ -12,7 +12,6 @@ from io import BytesIO
 
 
 API_URL = 'https://a55kqhh6wf.execute-api.us-east-1.amazonaws.com/default/rasterList'
-API_URL2 = 'https://qbfas799rl.execute-api.us-east-1.amazonaws.com/default/getRaster'
 
 @st.cache_data
 def get_raster_list():
@@ -29,51 +28,6 @@ def get_random_color():
 def get_colors(num_colors):
     listColors = list(colormaps)
     return listColors[:num_colors]
-
-def calculate_proximity_layer(selected_rasters_urls):
-    raster_infos = []
-    k_H = 0.01  # Decay hydrocarburesFoss
-    k_M = 0.01  # Decay minerals
-    w_H = 0.5   # Weight hydrocarburesFoss
-    w_M = 0.5   # Weight minerals
-
-    for url in selected_rasters_urls:
-        response = requests.get(url)
-        response.raise_for_status()
-        
-        with rasterio.open(BytesIO(response.content)) as src:
-            hydrocarbon_permits = src.read(1)  
-            profile = src.profile
-        
-        distance_to_hydrocarbon = distance_transform_edt(hydrocarbon_permits == 0)
-        
-        influence_hydrocarbon = np.exp(-k_H * distance_to_hydrocarbon)
-        
-        proximity_score = w_H * influence_hydrocarbon
-        
-        proximity_score = (proximity_score - np.min(proximity_score)) / (np.max(proximity_score) - np.min(proximity_score))
-        
-        profile.update(count=2, dtype='float32')
-                 
-        with rasterio.MemoryFile() as memfile:
-            with memfile.open(
-                driver='GTiff',
-                height=src.height,
-                width=src.width,
-                count=src.count,
-                dtype=src.dtypes[0],
-                crs=src.crs,
-                transform=src.transform,
-                compress='lzw',
-                tiled=True,
-                blockxsize=256, 
-                blockysize=256
-            ) as dst:
-                dst.write(proximity_score.astype(np.float32),1)
-    
-            cog_file = memfile.name
-        
-    return cog_file
 
 rasters = get_raster_list()
 rasters = json.loads(rasters['body'])
@@ -119,20 +73,6 @@ with st.sidebar.expander("Rasters", expanded=False):
     )
         raster_selections[raster] = st.checkbox(f"{raster}", value=False)
 
-with st.sidebar.expander("Selected Rasters", expanded=False):
-    selected_rasters_urls = []
-    if raster_selections.items(): 
-        for raster, selected in raster_selections.items():
-            if selected:
-                selected_rasters_urls.append(rasters_url[raster])
-                st.checkbox(f"{raster+'_selected'}", value=False)
-                variables[raster] = {
-                    'variable1': st.text_input(f"Decay for {raster}", key=f"{raster}_var1"),
-                    'variable2': st.text_input(f"Radius for {raster}", key=f"{raster}_var2")
-                }
-    else: 
-        st.write("No raster selected")
-
 m = leafmap.Map(center=(46.603354, 1.888334), zoom=6)
 
 m.add_basemap('OpenStreetMap')
@@ -142,10 +82,6 @@ for raster, selected in raster_selections.items():
     if selected:
         raster_url = rasters_url[raster]
         m.add_cog_layer(raster_url, name=raster, nodata=-9999, palette=colors[raster])
-
-if st.sidebar.button('Calculate Proximity Layer'):
-    proximity_layer_url = calculate_proximity_layer(selected_rasters_urls)
-    m.add_raster(proximity_layer_url, name="url", layer_name="TIFF Layer")
 
 m.to_streamlit(height=900)
 
