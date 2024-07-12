@@ -5,6 +5,8 @@ import random
 from io import StringIO
 import pandas as pd 
 from matplotlib import colormaps
+import requests
+
 
 
 API_URL = 'https://a55kqhh6wf.execute-api.us-east-1.amazonaws.com/default/rasterList'
@@ -86,9 +88,13 @@ for raster, selected in raster_selections.items():
         m.add_cog_layer(raster_url, name=raster, nodata=-9999, palette=colors[raster])
     if selected and raster == 'final_df.csv': 
         geo_df = pd.read_csv('final_geo_df.csv')
-        for lat, lon, city in zip(geo_df['latitude'], geo_df['longitude'], geo_df['hydrogen']):
+        for lat, lon, text, id in zip(geo_df['latitude'], geo_df['longitude'], geo_df['hydrogen'], geo_df['loc_file_name']):
             if lat and lon:
-                m.add_marker([lat, lon], popup=city)
+                print(id)
+                id = id.split('_')[0]
+                url = 'http://ficheinfoterre.brgm.fr/document/'+id
+                popup_text = f"<a href='{url}' target='_blank'>{text}</a>"
+                m.add_marker([lat, lon], popup=popup_text)
 
 m.to_streamlit(height=900)
 
