@@ -4,14 +4,7 @@ import json
 import random
 from io import StringIO
 import pandas as pd 
-import geopandas as gpd
-import requests
 from matplotlib import colormaps
-import urllib
-import csv
-import awswrangler as wr
-import numpy as np
-import boto3
 
 
 API_URL = 'https://a55kqhh6wf.execute-api.us-east-1.amazonaws.com/default/rasterList'
