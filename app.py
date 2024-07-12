@@ -2,13 +2,16 @@ import streamlit as st
 import leafmap.foliumap as leafmap
 import json
 import random
+from io import StringIO
+import pandas as pd 
+import geopandas as gpd
 import requests
 from matplotlib import colormaps
-from scipy.ndimage import distance_transform_edt
+import urllib
+import csv
+import awswrangler as wr
 import numpy as np
-import rasterio
-from io import BytesIO
-
+import boto3
 
 
 API_URL = 'https://a55kqhh6wf.execute-api.us-east-1.amazonaws.com/default/rasterList'
@@ -29,8 +32,10 @@ def get_colors(num_colors):
     listColors = list(colormaps)
     return listColors[:num_colors]
 
+
 rasters = get_raster_list()
 rasters = json.loads(rasters['body'])
+
 
 rasters_url = {}
 raster_selections = {}
@@ -70,8 +75,12 @@ with st.sidebar.expander("Rasters", expanded=False):
         </style>
         """,
         unsafe_allow_html=True
-    )
-        raster_selections[raster] = st.checkbox(f"{raster}", value=False)
+    )   
+        if raster == 'final_df.csv':
+            raster_selections[raster] = st.checkbox(f"OCR France", value=False)
+        else:   
+            raster_selections[raster] = st.checkbox(f"{raster}", value=False)
+
 
 m = leafmap.Map(center=(46.603354, 1.888334), zoom=6)
 
@@ -79,9 +88,14 @@ m.add_basemap('OpenStreetMap')
 m.add_basemap('HYBRID')
 
 for raster, selected in raster_selections.items():
-    if selected:
+    if selected and raster != 'final_df.csv':
         raster_url = rasters_url[raster]
         m.add_cog_layer(raster_url, name=raster, nodata=-9999, palette=colors[raster])
+    if selected and raster == 'final_df.csv': 
+        geo_df = pd.read_csv('final_geo_df.csv')
+        for lat, lon, city in zip(geo_df['latitude'], geo_df['longitude'], geo_df['hydrogen']):
+            if lat and lon:
+                m.add_marker([lat, lon], popup=city)
 
 m.to_streamlit(height=900)
 
